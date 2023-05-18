@@ -2,6 +2,8 @@ package me.bounser.nascraft;
 
 import de.leonhard.storage.Json;
 import de.leonhard.storage.util.FileUtils;
+import lombok.AccessLevel;
+import lombok.Getter;
 import me.bounser.nascraft.advancedgui.LayoutModifier;
 import me.bounser.nascraft.commands.MarketCommand;
 import me.bounser.nascraft.commands.NascraftCommand;
@@ -13,33 +15,62 @@ import me.bounser.nascraft.tools.Data;
 import me.leoko.advancedgui.manager.LayoutManager;
 import me.bounser.nascraft.tools.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.PluginDescriptionFile;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.plugin.java.JavaPluginLoader;
 
+import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.*;
 
 public final class Nascraft extends JavaPlugin {
 
-    private static Nascraft main;
+
+    @Getter(AccessLevel.PACKAGE)
+    private static boolean isUnitTest = false;
+
+    private static Nascraft nascraft;
     private static Economy econ = null;
 
-    public static Nascraft getInstance() { return main; }
+    public static Nascraft getInstance() { return nascraft; }
+
+
+    public Nascraft() {
+        nascraft = this;
+    }
+
+    @ParametersAreNonnullByDefault
+    public Nascraft(
+            JavaPluginLoader loader, PluginDescriptionFile description, File dataFolder, File file) {
+        super(loader, description, dataFolder, file);
+        nascraft = this;
+        isUnitTest = true;
+
+    }
+
 
     @Override
     public void onEnable() {
 
-        main = this;
         Config.getInstance();
 
+        PluginManager pluginManager = Bukkit.getPluginManager();
+
         if (!setupEconomy()) {
-            getLogger().severe("Nascraft failed to load! Vault is required.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+            if(!isUnitTest) {
+                getLogger().severe("Nascraft failed to load! Vault is required.");
+                getServer().getPluginManager().disablePlugin(this);
+                return;
+            } else {
+                getLogger().warning("Vault is mocked for unit testing.");
+            }
+
         }
 
-        if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+        if(pluginManager.getPlugin("PlaceholderAPI") != null) {
             new PAPIExpansion(this).register();
         }
 
@@ -53,7 +84,12 @@ public final class Nascraft extends JavaPlugin {
         getCommand("market").setExecutor(new MarketCommand());
         getCommand("sell").setExecutor(new SellCommand());
 
-        LayoutManager.getInstance().registerLayoutExtension(LayoutModifier.getInstance(), this);
+        if(!isUnitTest) {
+            LayoutManager.getInstance().registerLayoutExtension(LayoutModifier.getInstance(), this);
+        } else {
+            getLogger().warning("LayoutManager not registered, protocol lib is not loaded for unit testing.");
+        }
+
     }
 
     @Override
